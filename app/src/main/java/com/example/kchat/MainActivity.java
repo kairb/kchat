@@ -3,9 +3,12 @@ package com.example.kchat;
 import androidx.appcompat.app.AppCompatActivity;
 
 import android.os.Bundle;
+import android.os.Handler;
 import android.util.Log;
 import android.view.View;
+import android.view.WindowManager;
 import android.widget.EditText;
+import android.widget.TextView;
 
 import com.android.volley.Request;
 import com.android.volley.RequestQueue;
@@ -16,40 +19,43 @@ import com.android.volley.toolbox.StringRequest;
 import com.android.volley.toolbox.Volley;
 
 import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
-
 
 public class MainActivity extends AppCompatActivity{
     private RequestQueue queue;
     private int timeSinceLast = 0;
+    Handler handler = new Handler();
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         this.queue = Volley.newRequestQueue(this);
+        scheduleGetMessages();
+        getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN);
     }
 
     public void send(View view) {
         EditText comp = findViewById(R.id.messageEntry);
         String message = comp.getText().toString();
-        comp.setText("");
-        StringRequest stringRequest = new StringRequest
-                (Request.Method.POST, Constants.BASE_URL + "/messages?name=kai" + "&message=" + message ,
-                        new Response.Listener<String>() {
+        if(!message.equals("")){
+            comp.setText("");
+            StringRequest stringRequest = new StringRequest
+                    (Request.Method.POST, Constants.BASE_URL + "/messages?name=kai" + "&message=" + message ,
+                            new Response.Listener<String>() {
 
-                            @Override
-                            public void onResponse(String response) {
-                                Log.d("API", response);
-                            }
-                        }, new Response.ErrorListener() {
+                                @Override
+                                public void onResponse(String response) {
+                                    Log.d("API", response);
+                                }
+                            }, new Response.ErrorListener() {
 
-                    @Override
-                    public void onErrorResponse(VolleyError error) {
-                        Log.d("API", error.toString());
-                    }
-                });
-        queue.add(stringRequest);
+                        @Override
+                        public void onErrorResponse(VolleyError error) {
+                            Log.d("API", error.toString());
+                        }
+                    });
+            queue.add(stringRequest);
+            receive();
+        }
     }
 
     public void receive() {
@@ -60,6 +66,8 @@ public class MainActivity extends AppCompatActivity{
                             @Override
                             public void onResponse(JSONArray response) {
                                 Data.messages = response;
+                                TextView text = findViewById(R.id.messages);
+                                text.setText(Data.getMessageString());
                             }
                         }, new Response.ErrorListener() {
 
@@ -71,13 +79,15 @@ public class MainActivity extends AppCompatActivity{
         queue.add(stringRequest);
     }
 
-    @Override
-    protected void onResume() {
-        super.onResume();
-        if (timeSinceLast - System.currentTimeMillis() > Constants.GET_REQUEST_DELAY){
-            timeSinceLast = 0;
-            receive();
-            Log.d("API",Data.messages.toString());
-        }
+    public void scheduleGetMessages() {
+        handler.postDelayed(new Runnable() {
+            public void run() {
+                receive();
+                if(Data.messages != null){
+                    Log.d("API", Data.messages.toString());
+                }
+                handler.postDelayed(this, Constants.GET_REQUEST_DELAY);
+            }
+        }, Constants.GET_REQUEST_DELAY);
     }
 }
